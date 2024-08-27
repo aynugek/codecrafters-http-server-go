@@ -3,11 +3,13 @@ package main
 import (
 	"log"
 	"net"
+	"strings"
 )
 
 const (
-	CRLF     = "\r\n"
-	StatusOK = "HTTP/1.1 200 OK" + CRLF
+	CRLF           = "\r\n"
+	StatusOK       = "HTTP/1.1 200 OK" + CRLF
+	StatusNotFound = "HTTP/1.1 404 Not Found" + CRLF
 )
 
 func main() {
@@ -23,5 +25,17 @@ func main() {
 	}
 	defer conn.Close()
 
-	conn.Write([]byte(StatusOK + CRLF))
+	reqBytes := make([]byte, 1024)
+	n, err := conn.Read(reqBytes)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	reqBytes = reqBytes[:n]
+
+	target := strings.Fields(string(reqBytes))[1]
+	if target == "/" {
+		conn.Write([]byte(StatusOK + CRLF))
+		return
+	}
+	conn.Write([]byte(StatusNotFound + CRLF))
 }
