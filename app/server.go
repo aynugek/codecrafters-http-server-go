@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"strings"
@@ -36,6 +37,12 @@ func main() {
 	if target == "/" {
 		conn.Write([]byte(StatusOK + CRLF))
 		return
+	}
+	if strings.HasPrefix(target, "/echo/") {
+		endpoint := strings.TrimPrefix(target, "/echo/")
+		res := fmt.Sprintf("%sContent-Type: text/plain%sContent-Length: %d%s%s%s", StatusOK, CRLF, len(endpoint), CRLF, CRLF, endpoint)
+		conn.Write([]byte(res))
+
 	}
 	conn.Write([]byte(StatusNotFound + CRLF))
 }
