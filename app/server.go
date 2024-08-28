@@ -87,6 +87,11 @@ func handleConnection(conn net.Conn) {
 		endpoint := strings.TrimPrefix(req.Target, "/echo/")
 		sb.WriteString("Content-Type: text/plain" + CRLF)
 		sb.WriteString("Content-Length: " + strconv.Itoa(len(endpoint)) + CRLF)
+		if enc, exists := req.Headers["accept-encoding"]; exists {
+			if enc == "gzip" {
+				sb.WriteString("Content-Encoding: gzip" + CRLF)
+			}
+		}
 		sb.WriteString(CRLF)
 		sb.WriteString(endpoint)
 		conn.Write([]byte(sb.String()))
