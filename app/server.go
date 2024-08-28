@@ -13,6 +13,7 @@ const (
 	CRLF           = "\r\n"
 	StatusOK       = "200 OK"
 	StatusNotFound = "404 Not Found"
+	StatusCreated  = "201 Created"
 )
 
 type Request struct {
@@ -92,15 +93,25 @@ func handleConnection(conn net.Conn) {
 	} else if strings.HasPrefix(req.Target, "/files/") {
 		dir := os.Args[2]
 		filename := filepath.Join(dir, strings.TrimPrefix(req.Target, "/files/"))
-		data, err := os.ReadFile(filename)
-		if err != nil {
-			goto NotFound
+
+		if req.Method == "GET" {
+			data, err := os.ReadFile(filename)
+			if err != nil {
+				goto NotFound
+			}
+			sb.WriteString("Content-Type: application/octet-stream" + CRLF)
+			sb.WriteString("Content-Length: " + strconv.Itoa(len(data)) + CRLF)
+			sb.WriteString(CRLF)
+			sb.Write(data)
+		} else if req.Method == "POST" {
+			err = os.WriteFile(filename, []byte(req.Body), 0644)
+			if err != nil {
+				log.Fatal(err.Error())
+			}
+			sb.Reset()
+			sb.WriteString(req.HTTPVersion + " " + StatusCreated + CRLF + CRLF)
 		}
-		sb.WriteString("Content-Type: application/octet-stream" + CRLF)
-		sb.WriteString("Content-Length: " + strconv.Itoa(len(data)) + CRLF)
-		sb.WriteString(CRLF)
-		sb.Write(data)
-		log.Println(sb.String())
+
 		conn.Write([]byte(sb.String()))
 	}
 NotFound:
