@@ -1,9 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"log"
 	"net"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -68,28 +69,40 @@ func handleConnection(conn net.Conn) {
 		break
 	}
 
-	var b bytes.Buffer
+	var sb strings.Builder
+	sb.WriteString(req.HTTPVersion + " " + StatusOK + CRLF)
 
 	if req.Target == "/" {
 		conn.Write([]byte(req.HTTPVersion + " " + StatusOK + CRLF + CRLF))
 	} else if req.Target == "/user-agent" {
 		if ua, exists := req.Headers["user-agent"]; exists {
-			b.WriteString(req.HTTPVersion + " " + StatusOK + CRLF)
-			b.WriteString("Content-Type: text/plain" + CRLF)
-			b.WriteString("Content-Length: " + strconv.Itoa(len(ua)) + CRLF)
-			b.WriteString(CRLF)
-			b.WriteString(ua)
-			conn.Write(b.Bytes())
+			sb.WriteString("Content-Type: text/plain" + CRLF)
+			sb.WriteString("Content-Length: " + strconv.Itoa(len(ua)) + CRLF)
+			sb.WriteString(CRLF)
+			sb.WriteString(ua)
+			conn.Write([]byte(sb.String()))
 		}
 	} else if strings.HasPrefix(req.Target, "/echo/") {
 		endpoint := strings.TrimPrefix(req.Target, "/echo/")
-		b.WriteString(req.HTTPVersion + " " + StatusOK + CRLF)
-		b.WriteString("Content-Type: text/plain" + CRLF)
-		b.WriteString("Content-Length: " + strconv.Itoa(len(endpoint)) + CRLF)
-		b.WriteString(CRLF)
-		b.WriteString(endpoint)
-		conn.Write(b.Bytes())
-	} else {
-		conn.Write([]byte(req.HTTPVersion + " " + StatusNotFound + CRLF + CRLF))
+		sb.WriteString("Content-Type: text/plain" + CRLF)
+		sb.WriteString("Content-Length: " + strconv.Itoa(len(endpoint)) + CRLF)
+		sb.WriteString(CRLF)
+		sb.WriteString(endpoint)
+		conn.Write([]byte(sb.String()))
+	} else if strings.HasPrefix(req.Target, "/files/") {
+		dir := os.Args[2]
+		filename := filepath.Join(dir, strings.TrimPrefix(req.Target, "/files/"))
+		data, err := os.ReadFile(filename)
+		if err != nil {
+			goto NotFound
+		}
+		sb.WriteString("Content-Type: application/octet-stream" + CRLF)
+		sb.WriteString("Content-Length: " + strconv.Itoa(len(data)) + CRLF)
+		sb.WriteString(CRLF)
+		sb.Write(data)
+		log.Println(sb.String())
+		conn.Write([]byte(sb.String()))
 	}
+NotFound:
+	conn.Write([]byte(req.HTTPVersion + " " + StatusNotFound + CRLF + CRLF))
 }
