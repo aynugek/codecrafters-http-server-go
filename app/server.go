@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"log"
 	"net"
 	"os"
@@ -73,6 +75,11 @@ func handleConnection(conn net.Conn) {
 	var sb strings.Builder
 	sb.WriteString(req.HTTPVersion + " " + StatusOK + CRLF)
 
+	var encodedDataStruct struct {
+		Schema string
+		Data   string
+	}
+
 	if req.Target == "/" {
 		conn.Write([]byte(req.HTTPVersion + " " + StatusOK + CRLF + CRLF))
 	} else if req.Target == "/user-agent" {
@@ -86,17 +93,29 @@ func handleConnection(conn net.Conn) {
 	} else if strings.HasPrefix(req.Target, "/echo/") {
 		endpoint := strings.TrimPrefix(req.Target, "/echo/")
 		sb.WriteString("Content-Type: text/plain" + CRLF)
-		sb.WriteString("Content-Length: " + strconv.Itoa(len(endpoint)) + CRLF)
 		if encs, exists := req.Headers["accept-encoding"]; exists {
+			var b bytes.Buffer
 			for _, enc := range strings.Split(encs, ",") {
 				if strings.TrimSpace(enc) == "gzip" {
-					sb.WriteString("Content-Encoding: gzip" + CRLF)
+					w := gzip.NewWriter(&b)
+					w.Write([]byte(endpoint))
+					w.Close()
+					encodedDataStruct.Schema = "gzip"
+					encodedDataStruct.Data = b.String()
 					break
 				}
 			}
 		}
-		sb.WriteString(CRLF)
-		sb.WriteString(endpoint)
+		if encodedDataStruct.Schema != "" {
+			sb.WriteString("Content-Encoding: " + encodedDataStruct.Schema + CRLF)
+			sb.WriteString("Content-Length: " + strconv.Itoa(len(encodedDataStruct.Data)) + CRLF)
+			sb.WriteString(CRLF)
+			sb.WriteString(encodedDataStruct.Data)
+		} else {
+			sb.WriteString("Content-Length: " + strconv.Itoa(len(endpoint)) + CRLF)
+			sb.WriteString(CRLF)
+			sb.WriteString(endpoint)
+		}
 		conn.Write([]byte(sb.String()))
 	} else if strings.HasPrefix(req.Target, "/files/") {
 		dir := os.Args[2]
