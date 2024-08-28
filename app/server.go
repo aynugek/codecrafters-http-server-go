@@ -28,11 +28,16 @@ func main() {
 		log.Fatal("Failed to bind to port 4221")
 	}
 	defer l.Close()
-
-	conn, err := l.Accept()
-	if err != nil {
-		log.Fatal("Error accepting connection: ", err.Error())
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			log.Fatal("Error accepting connection: ", err.Error())
+		}
+		go handleConnection(conn)
 	}
+}
+
+func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	reqBytes := make([]byte, 1024)
